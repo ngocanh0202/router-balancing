@@ -1,0 +1,47 @@
+{
+  "name": "@anhbui02/rb-server",
+  "version": "0.0.0-dev",
+  "description": "Proxy Router Balancing chạy không giao diện (OpenAI-compatible /v1) cho Linux/macOS/server — dùng chung DB với rbctl",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/server.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rb-server"
+  },
+  "bugs": {
+    "url": "https://github.com/ngocanh0202/router-balancing/issues"
+  },
+  "keywords": [
+    "router-balancing",
+    "llm",
+    "openai",
+    "proxy",
+    "load-balancer",
+    "server",
+    "headless"
+  ],
+  "bin": {
+    "rb-server": "launcher.js"
+  },
+  "files": [
+    "launcher.js",
+    "lib/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@anhbui02/rb-server-win32-x64": "0.0.0-dev",
+    "@anhbui02/rb-server-win32-arm64": "0.0.0-dev",
+    "@anhbui02/rb-server-linux-x64": "0.0.0-dev",
+    "@anhbui02/rb-server-linux-arm64": "0.0.0-dev",
+    "@anhbui02/rb-server-darwin-x64": "0.0.0-dev",
+    "@anhbui02/rb-server-darwin-arm64": "0.0.0-dev"
+  },
+  "scripts": {
+    "test": "node --test test/resolve.test.js"
+  }
+}

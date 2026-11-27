@@ -1,0 +1,27 @@
+{
+  "name": "@anhbui02/rbtui-darwin-arm64",
+  "version": "0.0.0-dev",
+  "description": "Binary rbtui (macOS Apple Silicon) cho @anhbui02/rbtui — không cài trực tiếp gói này",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/tui.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbtui-darwin-arm64"
+  },
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/rbtui",
+    "README.md"
+  ],
+  "preferUnplugged": true,
+  "config": {
+    "dotnetRid": "osx-arm64"
+  }
+}

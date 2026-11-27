@@ -1,0 +1,27 @@
+{
+  "name": "@anhbui02/rbtui-win32-arm64",
+  "version": "0.0.0-dev",
+  "description": "Binary rbtui (Windows ARM64) cho @anhbui02/rbtui — không cài trực tiếp gói này",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/tui.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbtui-win32-arm64"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/rbtui.exe",
+    "README.md"
+  ],
+  "preferUnplugged": true,
+  "config": {
+    "dotnetRid": "win-arm64"
+  }
+}

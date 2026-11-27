@@ -1,0 +1,47 @@
+{
+  "name": "@anhbui02/rbtui",
+  "version": "0.0.0-dev",
+  "description": "Giao diện terminal toàn màn hình cho Router Balancing — provider, model, combo, client key, OpenCode (Windows, macOS, Linux)",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/tui.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbtui"
+  },
+  "bugs": {
+    "url": "https://github.com/ngocanh0202/router-balancing/issues"
+  },
+  "keywords": [
+    "router-balancing",
+    "llm",
+    "openai",
+    "proxy",
+    "load-balancer",
+    "tui",
+    "terminal-ui"
+  ],
+  "bin": {
+    "rbtui": "launcher.js"
+  },
+  "files": [
+    "launcher.js",
+    "lib/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@anhbui02/rbtui-win32-x64": "0.0.0-dev",
+    "@anhbui02/rbtui-win32-arm64": "0.0.0-dev",
+    "@anhbui02/rbtui-linux-x64": "0.0.0-dev",
+    "@anhbui02/rbtui-linux-arm64": "0.0.0-dev",
+    "@anhbui02/rbtui-darwin-x64": "0.0.0-dev",
+    "@anhbui02/rbtui-darwin-arm64": "0.0.0-dev"
+  },
+  "scripts": {
+    "test": "node --test test/resolve.test.js"
+  }
+}

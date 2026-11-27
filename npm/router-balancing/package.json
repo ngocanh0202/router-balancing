@@ -1,0 +1,46 @@
+{
+  "name": "@anhbui02/router-balancing",
+  "version": "0.0.0-dev",
+  "description": "Bộ Router Balancing cài một lần: rbctl (lệnh) + rbtui (giao diện terminal) + rb-server (proxy headless) — Windows, macOS, Linux",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/npm-tools.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/router-balancing"
+  },
+  "bugs": {
+    "url": "https://github.com/ngocanh0202/router-balancing/issues"
+  },
+  "keywords": [
+    "router-balancing",
+    "llm",
+    "openai",
+    "proxy",
+    "load-balancer",
+    "cli",
+    "tui",
+    "opencode"
+  ],
+  "bin": {
+    "rbctl": "cmd/rbctl.js",
+    "rbtui": "cmd/rbtui.js",
+    "rb-server": "cmd/rb-server.js"
+  },
+  "files": [
+    "cmd/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anhbui02/rbctl": "0.0.0-dev",
+    "@anhbui02/rbtui": "0.0.0-dev",
+    "@anhbui02/rb-server": "0.0.0-dev"
+  },
+  "scripts": {
+    "test": "node --test test/bundle.test.js"
+  }
+}

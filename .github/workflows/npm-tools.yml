@@ -1,0 +1,236 @@
+name: npm tools
+
+# CI/CD gói npm @anhbui02/rbtui + @anhbui02/rb-server (mỗi tool: gói chính + 6 gói nền tảng, thư mục npm/)
+# và gói gộp @anhbui02/router-balancing (rbctl + rbtui + rb-server, cài một lần).
+# Tách khỏi npm-cli.yml (rbctl).
+#   - PR/push: test launcher Node + kiểm tra đóng gói (không publish).
+#   - Release published / chạy tay: build 6 nền tảng (tool-build.yml) → publish gói nền tảng rồi gói
+#     chính bằng Trusted Publishing (OIDC) kèm provenance.
+#
+# Thiết lập một lần trên npmjs.com cho TỪNG gói @anhbui02/rbtui* và @anhbui02/rb-server*:
+# Settings → Trusted Publisher → GitHub Actions, repo ngocanh0202/router-balancing, workflow
+# "npm-tools.yml", environment "npm". Gói phải tồn tại trước — xem docs/npm-tools.md.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'npm/rbtui*/**'
+      - 'npm/rb-server*/**'
+      - 'npm/router-balancing/**'
+      - 'npm/scripts/set-version-tool.mjs'
+      - '.github/workflows/npm-tools.yml'
+      - '.github/workflows/tool-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'npm/rbtui*/**'
+      - 'npm/rb-server*/**'
+      - 'npm/router-balancing/**'
+      - 'npm/scripts/set-version-tool.mjs'
+      - '.github/workflows/npm-tools.yml'
+      - '.github/workflows/tool-build.yml'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version publish (vd 1.12.4 hoặc 1.13.0-beta.1)'
+        required: true
+      dry-run:
+        description: 'Chỉ chạy thử npm publish --dry-run'
+        type: boolean
+        default: true
+
+concurrency:
+  group: npm-tools-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # ---------------------------------------------------------------- CI
+  test-npm:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test launchers
+        run: |
+          (cd npm/rbtui && npm test)
+          (cd npm/rb-server && npm test)
+          (cd npm/router-balancing && npm test)
+
+      - name: Check packaging
+        run: |
+          set -euo pipefail
+          cp -r npm "$RUNNER_TEMP/npm"
+          for tool in rbtui rb-server; do
+            node "$RUNNER_TEMP/npm/scripts/set-version-tool.mjs" "$tool" 0.0.0-ci
+            for dir in "$RUNNER_TEMP"/npm/$tool-*; do
+              bin="$(node -p "require('$dir/package.json').files.find(f => f.startsWith('bin/'))")"
+              mkdir -p "$dir/$(dirname "$bin")"; echo placeholder > "$dir/$bin"
+              (cd "$dir" && npm pack --dry-run)
+            done
+            (cd "$RUNNER_TEMP/npm/$tool" && npm pack --dry-run)
+          done
+          node "$RUNNER_TEMP/npm/scripts/set-version-tool.mjs" router-balancing 0.0.0-ci
+          (cd "$RUNNER_TEMP/npm/router-balancing" && npm pack --dry-run)
+
+      - name: Resolve version
+        id: v
+        env:
+          RAW_VERSION: ${{ github.event_name == 'release' && github.ref_name || inputs.version || '0.0.0-ci' }}
+        run: |
+          VERSION="${RAW_VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then echo "tag=next" >> "$GITHUB_OUTPUT"; else echo "tag=latest" >> "$GITHUB_OUTPUT"; fi
+
+  # ---------------------------------------------------------------- CD
+  build-rbtui:
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: test-npm
+    uses: ./.github/workflows/tool-build.yml
+    with:
+      tool: rbtui
+      project: src/RouterBalancing.Tui/RouterBalancing.Tui.csproj
+      version: ${{ needs.test-npm.outputs.version }}
+
+  build-rb-server:
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: test-npm
+    uses: ./.github/workflows/tool-build.yml
+    with:
+      tool: rb-server
+      project: src/RouterBalancing.Server/RouterBalancing.Server.csproj
+      version: ${{ needs.test-npm.outputs.version }}
+
+  publish-npm:
+    needs: [ test-npm, build-rbtui, build-rb-server ]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write   # OIDC cho npm trusted publishing + provenance
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [ rbtui, rb-server ]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1 && npm --version
+
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ matrix.tool }}-*
+          path: artifacts
+
+      - name: Place binaries into platform packages
+        env:
+          TOOL: ${{ matrix.tool }}
+        run: |
+          set -euo pipefail
+          for dir in npm/$TOOL-*; do
+            rid="$(node -p "require('./$dir/package.json').config.dotnetRid")"
+            bin="$(node -p "require('./$dir/package.json').files.find(f => f.startsWith('bin/'))")"
+            src="artifacts/$TOOL-$rid/$(basename "$bin")"
+            test -s "$src" || { echo "Thiếu binary $src cho $dir"; exit 1; }
+            mkdir -p "$dir/$(dirname "$bin")"; cp "$src" "$dir/$bin"; chmod 755 "$dir/$bin"
+            echo "$dir/$bin ← $src"
+          done
+
+      - name: Set version
+        run: node npm/scripts/set-version-tool.mjs "${{ matrix.tool }}" "${{ needs.test-npm.outputs.version }}"
+
+      - name: Test launcher
+        working-directory: npm/${{ matrix.tool }}
+        run: npm test
+
+      # Gói nền tảng TRƯỚC, gói chính CUỐI; version đã có trên npm thì bỏ qua → chạy lại an toàn
+      - name: Publish packages
+        env:
+          TOOL: ${{ matrix.tool }}
+          VERSION: ${{ needs.test-npm.outputs.version }}
+          DIST_TAG: ${{ needs.test-npm.outputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && '--dry-run' || '' }}
+        run: |
+          set -euo pipefail
+          for dir in npm/$TOOL-* npm/$TOOL; do
+            name="$(node -p "require('./$dir/package.json').name")"
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "$name@$VERSION đã có trên npm — bỏ qua"; continue
+            fi
+            (cd "$dir" && npm publish --access public --tag "$DIST_TAG" $DRY_RUN)
+          done
+
+  # Gói gộp: publish SAU khi rbtui + rb-server (job trên) và rbctl (npm-cli.yml, chạy song song
+  # cùng release) đã có đúng version — npm từ chối nếu dependency chưa tồn tại lúc người dùng cài.
+  publish-bundle:
+    needs: [ test-npm, publish-npm ]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1 && npm --version
+
+      - name: Wait for rbctl / rbtui / rb-server on npm
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry-run) }}
+        env:
+          VERSION: ${{ needs.test-npm.outputs.version }}
+        run: |
+          set -euo pipefail
+          for pkg in @anhbui02/rbctl @anhbui02/rbtui @anhbui02/rb-server; do
+            for i in $(seq 60); do
+              npm view "$pkg@$VERSION" version >/dev/null 2>&1 && { echo "$pkg@$VERSION ✓"; break; }
+              [ "$i" = 60 ] && { echo "Hết giờ chờ $pkg@$VERSION (npm-cli.yml đã publish rbctl chưa?)"; exit 1; }
+              sleep 30
+            done
+          done
+
+      - name: Set version
+        run: node npm/scripts/set-version-tool.mjs router-balancing "${{ needs.test-npm.outputs.version }}"
+
+      - name: Test bundle
+        working-directory: npm/router-balancing
+        run: npm test
+
+      - name: Publish bundle
+        working-directory: npm/router-balancing
+        env:
+          VERSION: ${{ needs.test-npm.outputs.version }}
+          DIST_TAG: ${{ needs.test-npm.outputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && '--dry-run' || '' }}
+        run: |
+          if npm view "@anhbui02/router-balancing@$VERSION" version >/dev/null 2>&1; then
+            echo "@anhbui02/router-balancing@$VERSION đã có trên npm — bỏ qua"; exit 0
+          fi
+          npm publish --access public --tag "$DIST_TAG" $DRY_RUN

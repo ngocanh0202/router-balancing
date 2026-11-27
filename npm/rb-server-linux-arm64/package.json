@@ -1,0 +1,30 @@
+{
+  "name": "@anhbui02/rb-server-linux-arm64",
+  "version": "0.0.0-dev",
+  "description": "Binary rb-server (Linux ARM64 (glibc)) cho @anhbui02/rb-server — không cài trực tiếp gói này",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/server.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rb-server-linux-arm64"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/rb-server",
+    "README.md"
+  ],
+  "preferUnplugged": true,
+  "config": {
+    "dotnetRid": "linux-arm64"
+  }
+}
