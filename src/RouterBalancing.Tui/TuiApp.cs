@@ -18,7 +18,7 @@ namespace RouterBalancing.Tui;
 /// </summary>
 internal sealed class TuiApp
 {
-    private static readonly string[] Sections = ["Providers", "Models", "Combos", "Client keys", "OpenCode", "Status"];
+    private static readonly string[] Sections = ["Providers", "Models", "Accounts", "Combos", "Client keys", "OpenCode", "Status"];
 
     private readonly IServiceProvider _sp;
     private readonly string _dbPath;
@@ -31,6 +31,7 @@ internal sealed class TuiApp
     // dữ liệu đang hiển thị (song song với dòng trong _list)
     private List<Provider> _providers = [];
     private List<Model> _models = [];
+    private List<ProviderAccount> _accounts = [];
     private List<Combo> _combos = [];
     private List<ClientKey> _keys = [];
     private List<(bool IsCombo, long Id, string Label)> _ocRows = [];
@@ -97,9 +98,10 @@ internal sealed class TuiApp
             {
                 case 0: ShowProviders(); break;
                 case 1: ShowModels(); break;
-                case 2: ShowCombos(); break;
-                case 3: ShowKeys(); break;
-                case 4: ShowOpenCode(); break;
+                case 2: ShowAccounts(); break;
+                case 3: ShowCombos(); break;
+                case 4: ShowKeys(); break;
+                case 5: ShowOpenCode(); break;
                 default: ShowStatus(); break;
             }
         }
@@ -123,7 +125,7 @@ internal sealed class TuiApp
         _providers = Wait(() => S<IProviderService>().ListAsync()).OrderBy(p => p.Id).ToList();
         SetRows(_providers.Select(p =>
                 $"{(p.Enabled ? "[ON] " : "[off]")} {p.Name,-22} {p.Identifier ?? "-",-14} {p.Models.Count(m => m.Enabled),3}/{p.Models.Count,-4} model  {p.BaseUrl}"),
-            "a Thêm · Space Bật/tắt · Enter Xem model · f Lấy model · t Test · k Đổi API key · Del Xoá");
+            "a Thêm · Space Bật/tắt · Enter Xem model · k Accounts/API key · f Lấy model · t Test · Del Xoá");
     }
 
     private void ShowModels()
@@ -144,6 +146,114 @@ internal sealed class TuiApp
         SetRows(_models.Select(m =>
                 $"{(m.Enabled ? "[x]" : "[ ]")} {m.ModelId,-52} {(m.ContextWindow is { } c ? $"{c / 1000}k ctx" : "")}"),
             "Space Bật/tắt · e Bật hết · n Tắt hết · p Chọn provider · f Lấy lại danh sách · + Thêm tay");
+    }
+
+    private void OpenAccounts(Provider p)
+    {
+        _modelProvider = p;
+        _menu.SelectedItem = 2;
+        ShowSection(2);
+        _list.SetFocus();
+    }
+
+    /// <summary>Nhiều account (API key) cho một provider — proxy chia tải theo weight, mỗi account có giới hạn ngày riêng.</summary>
+    private void ShowAccounts()
+    {
+        _providers = Wait(() => S<IProviderService>().ListAsync()).OrderBy(p => p.Id).ToList();
+        _modelProvider = _modelProvider is null
+            ? _providers.FirstOrDefault()
+            : _providers.FirstOrDefault(p => p.Id == _modelProvider.Id) ?? _providers.FirstOrDefault();
+        _accounts = _modelProvider is null ? [] : Wait(() => S<IProviderAccountService>().ListAsync(_modelProvider.Id)).ToList();
+        _content.Title = $"Accounts — {_modelProvider?.Name ?? "(chưa có provider)"}";
+        SetRows(_accounts.Select(a =>
+                $"{(a.Enabled ? "[ON] " : "[off]")} {a.Name,-16} {(string.IsNullOrEmpty(a.ApiKeyEncrypted) ? "(không key)" : "key ✓"),-11} " +
+                $"weight {a.Weight,-5} " +
+                $"tok {a.TokensUsed}/{(a.DailyTokenLimit?.ToString() ?? "∞")} · req {a.RequestsUsed}/{(a.DailyRequestLimit?.ToString() ?? "∞")}  " +
+                (a.LastTestSuccess is null ? "" : a.LastTestSuccess == true ? "test OK" : "test LỖI")),
+            "a Thêm · Enter/e Sửa · Space Bật/tắt · t Test hết · p Chọn provider · Del Xoá");
+    }
+
+    private bool AccountKey(Key key, char ch, int i)
+    {
+        if (ch == 'p') { PickProvider(); return true; }
+        if (_modelProvider is null) return false;
+        var acc = i >= 0 && i < _accounts.Count ? _accounts[i] : null;
+        if (ch == 'a') { EditAccount(null); return true; }
+        if (ch == 't') { TestProvider(_modelProvider); return true; }
+        if (acc is null) return false;
+        if (ch == 'e' || key == Key.Enter) { EditAccount(acc); return true; }
+        if (key == Key.Space)
+        {
+            Wait(() => S<IProviderAccountService>().SetEnabledAsync(acc.Id, !acc.Enabled));
+            ShowAccounts();
+            return true;
+        }
+        if (IsDelete(key))
+        {
+            if (Confirm($"Xoá account '{acc.Name}' của {_modelProvider.Name}? (không xoá được account cuối cùng)"))
+            {
+                Wait(() => S<IProviderAccountService>().DeleteAsync(acc.Id));
+                ShowAccounts();
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static string[] ReadPatterns(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try { return System.Text.Json.JsonSerializer.Deserialize<string[]>(json) ?? []; }
+        catch (System.Text.Json.JsonException) { return []; }
+    }
+
+    private static int? ParseLimit(string text) =>
+        int.TryParse(text.Trim(), out var n) && n > 0 ? n : null;   // trống / 0 / chữ = không giới hạn
+
+    /// <summary>Thêm / sửa account. Sửa: để trống API key = giữ key cũ (giống app/rbctl), các field khác giữ nguyên nếu không đổi.</summary>
+    private void EditAccount(ProviderAccount? existing)
+    {
+        var provider = _modelProvider!;
+        var name = new TextField(existing?.Name ?? (_accounts.Count == 0 ? "Default" : $"acc{_accounts.Count + 1}")) { X = 22, Y = 1, Width = Dim.Fill(2) };
+        var key = new TextField("") { X = 22, Y = 3, Width = Dim.Fill(2), Secret = true };
+        var noKey = new CheckBox("Không dùng API key (provider free/no-auth)", existing is not null && string.IsNullOrEmpty(existing.ApiKeyEncrypted)) { X = 22, Y = 4 };
+        var weight = new TextField((existing?.Weight ?? 100).ToString()) { X = 22, Y = 6, Width = 10 };
+        var tokens = new TextField(existing?.DailyTokenLimit?.ToString() ?? "") { X = 22, Y = 8, Width = 14 };
+        var reqs = new TextField(existing?.DailyRequestLimit?.ToString() ?? "") { X = 22, Y = 10, Width = 14 };
+        var patterns = new TextField(string.Join(",", ReadPatterns(existing?.ModelPatterns))) { X = 22, Y = 12, Width = Dim.Fill(2) };
+        var enabled = new CheckBox("Bật", existing?.Enabled ?? true) { X = 22, Y = 14 };
+        var ok = false;
+        var save = new Button("Lưu", is_default: true);
+        var cancel = new Button("Huỷ");
+        save.Clicked += () => { ok = true; Application.RequestStop(); };
+        cancel.Clicked += () => Application.RequestStop();
+        var d = new Dialog(existing is null ? $"Thêm account — {provider.Name}" : $"Sửa account {existing.Name} — {provider.Name}", 84, 20, save, cancel);
+        d.Add(new Label("Tên:") { X = 1, Y = 1 }, name,
+              new Label(existing is null ? "API key:" : "API key (trống=giữ):") { X = 1, Y = 3 }, key, noKey,
+              new Label("Weight (0-10000):") { X = 1, Y = 6 }, weight,
+              new Label("Token/ngày:") { X = 1, Y = 8 }, tokens, new Label("trống = không giới hạn") { X = 38, Y = 8 },
+              new Label("Request/ngày:") { X = 1, Y = 10 }, reqs, new Label("trống = không giới hạn") { X = 38, Y = 10 },
+              new Label("Chỉ cho model:") { X = 1, Y = 12 }, patterns,
+              new Label("vd deepseek*,glm* — trống = mọi model") { X = 22, Y = 13 }, enabled);
+        name.SetFocus();
+        Application.Run(d);
+        if (!ok) return;
+
+        var draft = new ProviderAccountDraft
+        {
+            ProviderId = provider.Id,
+            Name = name.Text.ToString()!.Trim(),
+            ApiKey = key.Text.ToString()!.Trim(),
+            NoKey = noKey.Checked,
+            Enabled = enabled.Checked,
+            Weight = int.TryParse(weight.Text.ToString(), out var w) ? w : existing?.Weight ?? 100,
+            DailyTokenLimit = ParseLimit(tokens.Text.ToString()!),
+            DailyRequestLimit = ParseLimit(reqs.Text.ToString()!),
+            ModelPatterns = patterns.Text.ToString()!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        };
+        if (existing is null) Wait(() => S<IProviderAccountService>().CreateAsync(draft));
+        else Wait(() => S<IProviderAccountService>().UpdateAsync(existing.Id, draft));
+        ShowAccounts();
     }
 
     private void ShowCombos()
@@ -245,9 +355,10 @@ internal sealed class TuiApp
             {
                 0 => ProviderKey(key, ch, i),
                 1 => ModelKey(key, ch, i),
-                2 => ComboKey(key, ch, i),
-                3 => KeyKey(key, ch, i),
-                4 => OpenCodeKey(key, ch, i),
+                2 => AccountKey(key, ch, i),
+                3 => ComboKey(key, ch, i),
+                4 => KeyKey(key, ch, i),
+                5 => OpenCodeKey(key, ch, i),
                 _ => false,
             };
             if (handled) e.Handled = true;
@@ -271,7 +382,7 @@ internal sealed class TuiApp
                 ShowSection(1);
                 _list.SetFocus();
             }
-            else if (_section == 2 && i >= 0 && i < _combos.Count)
+            else if (_section == 3 && i >= 0 && i < _combos.Count)
             {
                 EditCombo(_combos[i]);
             }
@@ -297,7 +408,7 @@ internal sealed class TuiApp
         }
         if (ch == 'f') { FetchModels(p); return true; }
         if (ch == 't') { TestProvider(p); return true; }
-        if (ch == 'k') { ChangeKey(p); return true; }
+        if (ch == 'k') { OpenAccounts(p); return true; }
         if (IsDelete(key))
         {
             if (Confirm($"Xoá provider '{p.Name}' (kèm model/account)?"))
@@ -450,18 +561,6 @@ internal sealed class TuiApp
         if (Confirm($"Đã tạo '{p.Name}'. Lấy danh sách model ngay?")) FetchModels(p);
     }
 
-    private void ChangeKey(Provider p)
-    {
-        var accounts = Wait(() => S<IProviderAccountService>().ListAsync(p.Id));
-        var acc = accounts.FirstOrDefault();
-        var newKey = Prompt($"API key mới cho {p.Name}", acc is null ? "API key (tạo account 'Default'):" : $"API key cho account '{acc.Name}':", secret: true);
-        if (string.IsNullOrWhiteSpace(newKey)) return;
-        var draft = new ProviderAccountDraft { ProviderId = p.Id, Name = acc?.Name ?? "Default", ApiKey = newKey.Trim(), Enabled = true };
-        if (acc is null) Wait(() => S<IProviderAccountService>().CreateAsync(draft));
-        else Wait(() => S<IProviderAccountService>().UpdateAsync(acc.Id, draft));
-        Info("Đã lưu API key.");
-    }
-
     private void FetchModels(Provider p)
     {
         Busy($"Đang lấy danh sách model từ {p.Name}…", async () =>
@@ -496,7 +595,7 @@ internal sealed class TuiApp
         Application.Run(d);
         if (picked is null) return;
         _modelProvider = picked;
-        ShowModels();
+        ShowSection(_section);
     }
 
     private static ComboDraft ToDraft(Combo c) => new()
@@ -664,8 +763,9 @@ internal sealed class TuiApp
     private static void ShowHelp() => MessageBox.Query("Trợ giúp", """
         Tab: đổi giữa cột Mục và danh sách · ↑↓ chọn · Enter mở/sửa · F5 tải lại · F2 sáng/tối · Ctrl+Q thoát
 
-        Providers : a thêm · Space bật/tắt · Enter xem model · f lấy model · t test · k đổi key · Del xoá
+        Providers : a thêm · Space bật/tắt · Enter xem model · k accounts/API key · f lấy model · t test · Del xoá
         Models    : Space bật/tắt · e bật hết · n tắt hết · p chọn provider · f lấy lại · + thêm tay
+        Accounts  : a thêm (nhiều API key / provider) · Enter sửa · Space bật/tắt · t test · p chọn provider · Del xoá
         Combos    : a thêm · Enter sửa (Space chọn model theo thứ tự) · m đổi chế độ · Del xoá
         Client keys: c tạo · Space bật/tắt · Del xoá
         OpenCode  : Space chọn model/combo · w ghi opencode.json · r ghi + khởi động lại opencode (tmux)

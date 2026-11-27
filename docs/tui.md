@@ -21,8 +21,9 @@ Release: [`release-tui.yml`](../.github/workflows/release-tui.yml) đính kèm `
 | Mục | Phím |
 |---|---|
 | Chung | `Tab` đổi khung · `↑↓` chọn · `Enter` mở/sửa · `F5` tải lại · `F2` sáng/tối (mặc định tối, nhớ lựa chọn) · `F1` trợ giúp · `Ctrl+Q` thoát |
-| Providers | `a` thêm · `Space` bật/tắt · `Enter` xem model · `f` lấy model · `t` test · `k` đổi API key · `Del` xoá |
+| Providers | `a` thêm · `Space` bật/tắt · `Enter` xem model · `k` mở Accounts · `f` lấy model · `t` test · `Del` xoá |
 | Models | `Space` bật/tắt · `e` bật hết · `n` tắt hết · `p` chọn provider · `f` lấy lại · `+` thêm tay |
+| Accounts | nhiều API key cho một provider: `a` thêm (tên, key, weight, giới hạn token/request mỗi ngày, model pattern) · `Enter`/`e` sửa (key trống = giữ key cũ) · `Space` bật/tắt · `t` test · `p` chọn provider · `Del` xoá |
 | Combos | `a` thêm · `Enter` sửa (`Space` chọn model theo thứ tự fallback) · `m` đổi Fallback/Round-robin · `Del` xoá |
 | Client keys | `c` tạo (key hiện 1 lần) · `Space` bật/tắt · `Del` xoá |
 | OpenCode | `Space` chọn model/combo · `w` ghi `opencode.json` · `r` ghi + khởi động lại opencode (tmux `main:opencode`) |
