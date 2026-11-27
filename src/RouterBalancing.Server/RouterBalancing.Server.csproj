@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    rb-server: chạy proxy Router Balancing KHÔNG giao diện (headless) — dành cho Linux/macOS/server,
+    nơi app desktop MAUI không chạy được. Dùng chung DB + file khoá với rbctl, quản lý bằng rbctl.
+    Project độc lập (không nằm trong router-balancing.slnx), chỉ tham chiếu Core như rbctl.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RouterBalancing.Server</RootNamespace>
+    <AssemblyName>rb-server</AssemblyName>
+    <Version>1.12.3.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Kestrel, DI, HttpClientFactory, Logging: shared framework mà Core đã dùng -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RouterBalancing.Core\RouterBalancing.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dùng CHÍNH file mã hoá key của rbctl (link, không chép) để server và rbctl đọc chung
+         DB + secret.key trên macOS/Linux — định dạng rbaes1: luôn khớp nhau. -->
+    <Compile Include="..\RouterBalancing.Cli\FileKeySecretProtector.cs" Link="FileKeySecretProtector.cs" />
+  </ItemGroup>
+
+</Project>
