@@ -1,0 +1,56 @@
+name: CI CLI
+
+# Build + test rbctl (src/RouterBalancing.Cli) trên Windows, Linux và macOS — tách khỏi ci.yml
+# để không phải sửa workflow có sẵn; chỉ chạy khi đụng CLI, Core (CLI phụ thuộc) hoặc file này.
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/RouterBalancing.Cli/**'
+      - 'src/RouterBalancing.Core/**'
+      - 'tests/RouterBalancing.Cli.Tests/**'
+      - '.github/workflows/ci-cli.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'src/RouterBalancing.Cli/**'
+      - 'src/RouterBalancing.Core/**'
+      - 'tests/RouterBalancing.Cli.Tests/**'
+      - '.github/workflows/ci-cli.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cli-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  CLI_PROJECT: src/RouterBalancing.Cli/RouterBalancing.Cli.csproj
+  CLI_TEST_PROJECT: tests/RouterBalancing.Cli.Tests/RouterBalancing.Cli.Tests.csproj
+
+jobs:
+  build-and-test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows: DPAPI; Linux/macOS: protector AES-GCM file khoá — mỗi OS một đường mã hoá
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # CLI không cần MAUI workload — chỉ Core + shared framework ASP.NET Core
+      - name: Build CLI
+        run: dotnet build ${{ env.CLI_PROJECT }} -c Release --nologo
+
+      - name: Test CLI
+        run: dotnet test ${{ env.CLI_TEST_PROJECT }} -c Release --no-banner

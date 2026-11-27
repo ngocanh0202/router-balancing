@@ -1,0 +1,30 @@
+{
+  "name": "@anhbui02/rbctl-linux-x64",
+  "version": "0.0.0-dev",
+  "description": "Binary rbctl (Linux x64 (glibc)) cho @anhbui02/rbctl — không cài trực tiếp gói này",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/cli.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbctl-linux-x64"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/rbctl",
+    "README.md"
+  ],
+  "preferUnplugged": true,
+  "config": {
+    "dotnetRid": "linux-x64"
+  }
+}
