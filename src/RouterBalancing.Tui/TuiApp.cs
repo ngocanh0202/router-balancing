@@ -53,6 +53,8 @@ internal sealed class TuiApp
     public void Run()
     {
         Application.Init();
+        Theme.Load();
+        Theme.Apply();   // mặc định giao diện tối; F2 đổi sáng/tối
         var top = Application.Top;
 
         var win = new Window("Router Balancing — rbtui") { X = 0, Y = 0, Width = Dim.Fill(), Height = Dim.Fill(1) };
@@ -72,9 +74,11 @@ internal sealed class TuiApp
             new(Key.Tab, "~Tab~ Đổi khung", () => { if (_menu.HasFocus) _list.SetFocus(); else _menu.SetFocus(); }),
             new(Key.F5, "~F5~ Tải lại", () => ShowSection(_section)),
             new(Key.F1, "~F1~ Trợ giúp", ShowHelp),
+            new(Key.F2, "~F2~ Sáng/Tối", Theme.Toggle),
             new(Key.CtrlMask | Key.Q, "~^Q~ Thoát", () => Application.RequestStop()),
         });
         top.Add(win, bar);
+        Theme.Recolor(top);
         ShowSection(0);
         _menu.SetFocus();
         Application.Run();
@@ -658,7 +662,7 @@ internal sealed class TuiApp
     private static void Error(Exception ex) => MessageBox.ErrorQuery("Lỗi", ex.GetBaseException().Message, "OK");
 
     private static void ShowHelp() => MessageBox.Query("Trợ giúp", """
-        Tab: đổi giữa cột Mục và danh sách · ↑↓ chọn · Enter mở/sửa · F5 tải lại · Ctrl+Q thoát
+        Tab: đổi giữa cột Mục và danh sách · ↑↓ chọn · Enter mở/sửa · F5 tải lại · F2 sáng/tối · Ctrl+Q thoát
 
         Providers : a thêm · Space bật/tắt · Enter xem model · f lấy model · t test · k đổi key · Del xoá
         Models    : Space bật/tắt · e bật hết · n tắt hết · p chọn provider · f lấy lại · + thêm tay

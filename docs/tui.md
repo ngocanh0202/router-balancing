@@ -20,7 +20,7 @@ Release: [`release-tui.yml`](../.github/workflows/release-tui.yml) đính kèm `
 
 | Mục | Phím |
 |---|---|
-| Chung | `Tab` đổi khung · `↑↓` chọn · `Enter` mở/sửa · `F5` tải lại · `F1` trợ giúp · `Ctrl+Q` thoát |
+| Chung | `Tab` đổi khung · `↑↓` chọn · `Enter` mở/sửa · `F5` tải lại · `F2` sáng/tối (mặc định tối, nhớ lựa chọn) · `F1` trợ giúp · `Ctrl+Q` thoát |
 | Providers | `a` thêm · `Space` bật/tắt · `Enter` xem model · `f` lấy model · `t` test · `k` đổi API key · `Del` xoá |
 | Models | `Space` bật/tắt · `e` bật hết · `n` tắt hết · `p` chọn provider · `f` lấy lại · `+` thêm tay |
 | Combos | `a` thêm · `Enter` sửa (`Space` chọn model theo thứ tự fallback) · `m` đổi Fallback/Round-robin · `Del` xoá |
