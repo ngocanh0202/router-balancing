@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    rbtui: giao diện terminal toàn màn hình cho Router Balancing (giống opencode/htop) — quản lý
+    provider, model, combo, client key, ghi cấu hình opencode. Dùng CHUNG DB + khoá với rbctl/rb-server.
+    Project độc lập (không nằm trong router-balancing.slnx), chỉ thêm file mới.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RouterBalancing.Tui</RootNamespace>
+    <AssemblyName>rbtui</AssemblyName>
+    <Version>1.12.3.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Terminal.Gui v1: TUI toàn màn hình, chạy Windows/macOS/Linux -->
+    <PackageReference Include="Terminal.Gui" Version="1.17.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RouterBalancing.Core\RouterBalancing.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Dùng CHÍNH container DI + mã hoá key của rbctl (link, không chép) → hành vi giống hệt rbctl -->
+    <Compile Include="..\RouterBalancing.Cli\CliServices.cs" Link="Shared\CliServices.cs" />
+    <Compile Include="..\RouterBalancing.Cli\FileKeySecretProtector.cs" Link="Shared\FileKeySecretProtector.cs" />
+  </ItemGroup>
+
+</Project>
