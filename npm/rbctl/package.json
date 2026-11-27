@@ -1,0 +1,47 @@
+{
+  "name": "@anhbui02/rbctl",
+  "version": "0.0.0-dev",
+  "description": "CLI quản lý Router Balancing — provider, account, model, combo, client key, settings, OpenCode config (Windows, macOS, Linux)",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/cli.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbctl"
+  },
+  "bugs": {
+    "url": "https://github.com/ngocanh0202/router-balancing/issues"
+  },
+  "keywords": [
+    "router-balancing",
+    "llm",
+    "openai",
+    "proxy",
+    "load-balancer",
+    "cli",
+    "opencode"
+  ],
+  "bin": {
+    "rbctl": "bin/rbctl.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@anhbui02/rbctl-win32-x64": "0.0.0-dev",
+    "@anhbui02/rbctl-win32-arm64": "0.0.0-dev",
+    "@anhbui02/rbctl-linux-x64": "0.0.0-dev",
+    "@anhbui02/rbctl-linux-arm64": "0.0.0-dev",
+    "@anhbui02/rbctl-darwin-x64": "0.0.0-dev",
+    "@anhbui02/rbctl-darwin-arm64": "0.0.0-dev"
+  },
+  "scripts": {
+    "test": "node --test test/resolve.test.js test/launcher.test.js"
+  }
+}

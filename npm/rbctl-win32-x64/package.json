@@ -1,0 +1,27 @@
+{
+  "name": "@anhbui02/rbctl-win32-x64",
+  "version": "0.0.0-dev",
+  "description": "Binary rbctl (Windows x64) cho @anhbui02/rbctl — không cài trực tiếp gói này",
+  "license": "Apache-2.0",
+  "author": "HKStudio011",
+  "homepage": "https://github.com/ngocanh0202/router-balancing/blob/master/docs/cli.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ngocanh0202/router-balancing.git",
+    "directory": "npm/rbctl-win32-x64"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/rbctl.exe",
+    "README.md"
+  ],
+  "preferUnplugged": true,
+  "config": {
+    "dotnetRid": "win-x64"
+  }
+}

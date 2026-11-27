@@ -1,0 +1,7 @@
+# Binary do CI/script build (dotnet publish) chép vào lúc phát hành — không commit
+rbctl-*/bin/
+*.tgz
+node_modules/
+# .gitignore gốc bỏ qua mọi thư mục [Bb]in/ (template Visual Studio) — launcher Node nằm
+# trong npm/rbctl/bin/ nên phải đưa lại vào repo
+!/rbctl/bin/

@@ -1,0 +1,166 @@
+name: npm CLI
+
+# CI/CD gói npm @anhbui02/rbctl + 6 gói nền tảng (thư mục npm/). Tách khỏi ci.yml/release.yml.
+#   - PR/push: test launcher Node + kiểm tra đóng gói mọi gói (không publish).
+#   - Release published / chạy tay: build binary mọi nền tảng (cli-build.yml) → publish gói
+#     nền tảng rồi gói chính bằng Trusted Publishing (OIDC, không token) kèm provenance.
+#
+# Thiết lập một lần trên npmjs.com cho TỪNG gói @anhbui02/rbctl*: Settings → Trusted Publisher →
+# GitHub Actions, repo HKStudio011/router-balancing, workflow "npm-cli.yml", environment "npm".
+# Gói phải tồn tại trước — xem docs/cli.md mục "Phát hành npm".
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'npm/**'
+      - 'src/RouterBalancing.Cli/**'
+      - '.github/workflows/npm-cli.yml'
+      - '.github/workflows/cli-build.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'npm/**'
+      - 'src/RouterBalancing.Cli/**'
+      - '.github/workflows/npm-cli.yml'
+      - '.github/workflows/cli-build.yml'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version publish (vd 1.12.4 hoặc 1.13.0-beta.1)'
+        required: true
+      dry-run:
+        description: 'Chỉ chạy thử npm publish --dry-run'
+        type: boolean
+        default: true
+
+concurrency:
+  group: npm-cli-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  # ---------------------------------------------------------------- CI
+  test-npm:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test launcher
+        working-directory: npm/rbctl
+        run: npm test
+
+      # Bản sao trong RUNNER_TEMP để không làm bẩn workspace; binary giả chỉ để kiểm tra danh sách file
+      - name: Check packaging
+        run: |
+          set -euo pipefail
+          cp -r npm "$RUNNER_TEMP/npm"
+          node "$RUNNER_TEMP/npm/scripts/set-version.mjs" 0.0.0-ci
+          for dir in "$RUNNER_TEMP"/npm/rbctl-*; do
+            bin="$(node -p "require('$dir/package.json').files.find(f => f.startsWith('bin/'))")"
+            mkdir -p "$dir/$(dirname "$bin")"
+            echo placeholder > "$dir/$bin"
+            (cd "$dir" && npm pack --dry-run)
+          done
+          (cd "$RUNNER_TEMP/npm/rbctl" && npm pack --dry-run)
+
+      - name: Resolve version
+        id: v
+        env:
+          RAW_VERSION: ${{ github.event_name == 'release' && github.ref_name || inputs.version || '0.0.0-ci' }}
+        run: |
+          VERSION="${RAW_VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # Prerelease (1.13.0-beta.1) không được chiếm dist-tag "latest"
+          if [[ "$VERSION" == *-* ]]; then echo "tag=next" >> "$GITHUB_OUTPUT"; else echo "tag=latest" >> "$GITHUB_OUTPUT"; fi
+
+  # ---------------------------------------------------------------- CD
+  build:
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    needs: test-npm
+    uses: ./.github/workflows/cli-build.yml
+    with:
+      version: ${{ needs.test-npm.outputs.version }}
+
+  publish-npm:
+    needs: [ test-npm, build ]
+    runs-on: ubuntu-latest
+    # Environment "npm": khớp cấu hình trusted publisher; thêm required reviewers để gate tay
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write   # OIDC cho npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing cần npm >= 11.5.1
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1 && npm --version
+
+      # TODO(HKStudio011): pin SHA như các action khác khi review
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rbctl-*
+          path: artifacts
+
+      # artifacts/rbctl-<rid>/… → npm/<gói có config.dotnetRid = rid>/bin/…; artifact không giữ
+      # bit thực thi nên chmod lại (launcher cũng tự chmod khi thiếu, đây là lớp chính).
+      - name: Place binaries into platform packages
+        run: |
+          set -euo pipefail
+          for dir in npm/rbctl-*; do
+            rid="$(node -p "require('./$dir/package.json').config.dotnetRid")"
+            bin="$(node -p "require('./$dir/package.json').files.find(f => f.startsWith('bin/'))")"
+            src="artifacts/rbctl-$rid/$(basename "$bin")"
+            test -s "$src" || { echo "Thiếu binary $src cho $dir"; exit 1; }
+            mkdir -p "$dir/$(dirname "$bin")"
+            cp "$src" "$dir/$bin"
+            chmod 755 "$dir/$bin"
+            echo "$dir/$bin ← $src"
+          done
+
+      - name: Set version
+        run: node npm/scripts/set-version.mjs "${{ needs.test-npm.outputs.version }}"
+
+      - name: Test launcher
+        working-directory: npm/rbctl
+        run: npm test
+
+      # Gói nền tảng TRƯỚC, gói chính CUỐI (optionalDependencies ghim đúng version này).
+      # Bỏ qua gói đã có version đó → chạy lại workflow sau lỗi giữa chừng vẫn an toàn.
+      - name: Publish packages
+        env:
+          VERSION: ${{ needs.test-npm.outputs.version }}
+          DIST_TAG: ${{ needs.test-npm.outputs.tag }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run && '--dry-run' || '' }}
+        run: |
+          set -euo pipefail
+          for dir in npm/rbctl-* npm/rbctl; do
+            name="$(node -p "require('./$dir/package.json').name")"
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "$name@$VERSION đã có trên npm — bỏ qua"
+              continue
+            fi
+            (cd "$dir" && npm publish --access public --tag "$DIST_TAG" $DRY_RUN)
+          done
